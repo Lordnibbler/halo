@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>jQTouch &beta;t</title>
+<style type="text/css" media="screen">@import "jqtouch/jqtouch.css";</style>
+<style type="text/css" media="screen">@import "themes/jqt/theme.css";</style>
+<style type="text/css" media="screen">@import "jqt.bars/jqt.bars.css";</style>
+<style type="text/css" media="screen">@import "jqt.bars/themes/jqt/theme.css";</style>
+<style type="text/css" media="screen">@import "jqt.listIndex/jqt.listIndex.css";</style>
+<style type="text/css" media="screen">@import  "sw/spinningwheel.css";</style>
+ <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js" type="text/javascript" charset="utf-8"></script> -->
+<script src="jqtouch/jquery-1.4.2.js" type="text/javascript" charset="utf-8"></script>
+
+	<script src="jqtouch/jqtouch.js" type="application/x-javascript" charset="utf-8"></script>
+
+
+<!-- <script src="jqt.autotitles.js" type="application/x-javascript" charset="utf-8"></script> -->
+<script src="jqt.bars/jqt.bars.js" type="application/x-javascript" charset="utf-8"></script>
+<script src="jqt.listIndex/jqt.listIndex.js" type="application/x-javascript" charset="utf-8"></script>
+<script type="text/javascript" src="sw/spinningwheel-min.js?v=1.4"></script>
+
+<style type="text/css" media="screen">
+#jqt.fullscreen #schedule .info,
+#jqt.fullscreen #plastic .info {
+  display:none;
+}
+.sw- {color:black;}
+#on_button{ position:absolute;left:65px; top:100px;}
+#off_button{ position:absolute;left:180px; top:100px;}
+#playlist_selector_div{ position:absolute;left:30px; top:200px; font-size: 24px;}
+#playlist_selector_div select{width:260px; font-size: 24px; text-overflow: ellipsis;}
+#power_status{ position:absolute;left:30px; top:350px; width:260px; height:48px; background-color:grey; }
+.command {font-size:20px; left:5px; position:absolute;}
+.time {font-size:20px; right:50px; position:absolute;}
+.delete{background-image:url(bar_img/delete-32.png);}
+#jqt ul.metal li{height:25px;}
+</style>
+
+<script type="text/javascript" charset="utf-8">
+var jQT = new $.jQTouch({
+  icon: 'jqtouch.png',
+  icon4: 'jqtouch4.png',
+  addGlossToIcon: false,
+  slideleftSelector: '#jqt > ul > li > a, #jqt > ol > li > a',
+  startupScreen: 'jqt_startup.png',
+  statusBar: 'black',
+});
+// Some sample Javascript functions:
+$(function(){
+
+	
+  $('a[target="_blank"]').click(function(){
+    if(confirm('This link opens in a new window.')){
+      return true;
+    } else {
+      return false;
+    }
+  });
+// Page animation callback events
+  $('#pageevents').
+  bind('pageAnimationStart', function(e, info){
+    $(this).find('.info').append('Started animating ' + info.direction + '&hellip; ');
+  }).
+  bind('pageAnimationEnd', function(e, info){
+    $(this).find('.info').append(' finished animating ' + info.direction + '.<br /><br />');
+  });
+// Page animations end with AJAX callback event, example 1 (load remote HTML only first time)
+  $('#callback').bind('pageAnimationEnd', function(e, info){
+// Make sure the data hasn't already been loaded (we'll set 'loaded' to true a couple lines further down)
+    if(!$(this).data('loaded')){
+// Append a placeholder in case the remote HTML takes its sweet time making it back
+// Then, overwrite the "Loading" placeholder text with the remote HTML
+      $(this).append($('<div>Loading</div>').load('ajax.html .info', function(){
+// Set the 'loaded' var to true so we know not to reload
+// the HTML next time the #callback div animation ends
+        $(this).parent().data('loaded', true);
+      }));
+    }
+  });
+// Orientation callback event
+  // $('#jqt').bind('turn', function(e, data){
+  //   $('#orient').html('Orientation: ' + data.orientation);
+  // });
+	
+	GetPlaylists();
+	$("#command_selector").change(function(){
+		var  command_selected = "";
+		$("#command_selector option:selected").each(function () {
+		                command_selected += $(this).text();
+		              });
+	});
+});
+
+function SendOn(){
+	var playlist_selected = $("#playlist_selector").val();
+	$("#power_status").html("Sending On Command with "+ playlist_selected + " playlist");
+	$.post( "/cgi-bin/scripts/change_light.cgi",{command:"POWER_ON", playlist:playlist_selected },
+	                       function( data ) {
+	                        $("#power_status").html("Turned Halo on with "+ data + " playlist");
+	                       }
+	                    );
+}
+function SendOff(){
+	var playlist_selected = $("#playlist_selector").val();
+	$("#power_status").html("Sending Off Command with ");
+	$.post( "/cgi-bin/scripts/change_light.cgi",{command:"POWER_OFF" },
+	                       function( data ) {
+	                        $("#power_status").html("Turned Halo off");
+	                       }
+	                    );
+}
+function GetPlaylists(){
+	
+	 $.post( "/cgi-bin/scripts/change_light.cgi",{command:"list_playlists" },
+	                        function( data ) {
+	                         	var names = data.split(',');
+	      						$("#playlist_selector").empty();
+								$("#command_selector").empty();
+	    						for(i = 0; i<names.length - 1;i++){
+									$("#command_selector").append('<option  value="'+names[i]+'">'+names[i]+'</option>');
+	      							$("#playlist_selector").append('<option  value="'+names[i]+'">'+names[i]+'</option>');
+	    						}
+	                       }
+	                     );
+
+}
+function OpenTimePicker() {
+	var now = new Date();
+	var minutes = { };
+	var hours = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,10:10,11:11 ,12:12 };
+	var am_pm = {1: 'AM', 2:'PM'};
+	for( var i = 0; i < 60; i += 1 ) {
+		if(i < 10){
+			minutes[i] = '0'+i;
+		}else {
+			minutes[i] = i;
+		}
+		
+	}
+    var current_pm;
+	var current_hours =  now.getHours();
+	if(current_hours >=12){
+		current_hours = current_hours -12;
+		current_pm = 2;
+	}else {
+		current_pm = 1;
+	}
+	
+	if(current_hours == 0){
+		current_hours = 12;
+	}
+
+	SpinningWheel.addSlot(hours, '', current_hours);
+	SpinningWheel.addSlot(minutes, '', now.getMinutes());
+	SpinningWheel.addSlot(am_pm, '', current_pm);
+	
+	SpinningWheel.setCancelAction(cancel_pick);
+	SpinningWheel.setDoneAction(time_picked);
+
+	SpinningWheel.open();
+}
+function time_picked() {
+	var results = SpinningWheel.getSelectedValues();
+	$("#time_new").html(results.values[0]+":" + results.values[1]+ " " +results.values[2]);
+}
+
+function cancel_pick() {
+
+}
+function submitEntry(){
+	var command_value = $("input[name='command']:checked").val();
+	var repeat_value = $("input[name='repeat']:checked").val();
+	var playlist_selected = $("#command_selector").val();
+	var time = $("#time_new").text();
+	if(command_value == "turn_off"){
+		
+		$("#schedule_items").append("<li>  <span class='command'> Turn Off </span><span class='time'>"+ time+ "</span> <span class='delete'> </span></li>");
+		
+	}
+	if(command_value == "start_playlist"){
+		if(repeat_value == "repeat_list"){
+			$("#schedule_items").append("<li><span class='command'>"+playlist_selected+"*</span> <span class='time'>"+time + " </span><span class='delete'> </span> </li>");
+		}else{
+			$("#schedule_items").append("<li><span class='command'>"+playlist_selected+"</span>  <span class='time'>"+time + "</span> <span class='delete'> </span></li>");
+		}
+		
+	}
+
+}
+</script>
+
+</head>
+<body>
+
+<!-- tabbar -->
+<div id="tabbar">
+	<div>
+    <ul>
+		<li>
+	        <a href="#power" mask="bar_img/demos.png" mask2x="bar_img/demos@2x.png" >
+	          <strong>Power</strong>
+	        </a>
+	    </li>
+		
+		<li>
+	         <a href="#schedule" mask="bar_img/demos.png" mask2x="bar_img/demos@2x.png">
+	           <strong>Schedule</strong>
+	         </a>
+	    </li>
+      
+    </ul>
+  </div>
+</div>
+
+
+<div id="jqt">
+
+ 
+
+<!-- UI - Buttons -->
+  <div id="power" class="current keep_tabbar">
+    <div class="toolbar">
+      <h1>System Power</h1>
+	  <a href="#power" class="button leftButton" onclick="GetPlaylists()">refresh</a>
+    </div>
+	<div>
+	    <div id="on_button">
+	            <a href="#power" class="greenButton" onclick="SendOn()">ON</a>
+	    </div>
+		<div id="off_button">
+				<a href="#power" class="redButton" onclick="SendOff()">OFF</a>
+	    </div>
+		<div id="playlist_selector_div">
+			<span> Playlist:
+			<select id="playlist_selector">
+	      	<option value ="volvo">Volvo</option>
+	      	<option value ="saab">Saab</option>
+	      	<option value="mercedes">Mercedes</option>
+	      	<option value="audi">Audi</option>
+	    	</select>
+			</span>
+		</div>
+		<div id="power_status">
+			Welcome! to this very long sentence that I'm trying to warp
+		</div>
+	</div>
+  </div>
+
+
+<div id="schedule" >
+    <div class="toolbar">
+      <h1>Schedule</h1>
+	  <a href="#schedule" class="button leftButton">refresh</a>
+	  <a href="#add" class="button rightButton">Add</a>
+    </div>
+     <div class="s-scrollwrapper">
+		<div>
+		<ul id="schedule_items" class="metal">
+
+		</ul>
+		</div>
+	</div>
+ </div>
+ <div id="add" class="edit">
+     <form>
+         <div class="toolbar">
+             <h1>New Todo</h1>
+             <a href="#" class="button back">Cancel</a>
+         </div>
+         <ul class="plastic">
+             <li id="time_new" onclick="OpenTimePicker()">9:50 PM</li>
+			<!-- <li><span> Command:
+			<select id="command_selector">
+				<option value ="turn_off">Turn Off System</option>
+	      		<option value ="start_playlist">Start Playlist</option>
+	    	</select>
+			</span></li> -->
+			<li> <input type="radio" name="command" value="turn_off"/> Turn Off</li>
+			<li> <input type="radio" name="command" value="start_playlist"/> Start Playlist 
+				<select id="command_selector">
+				<option value ="turn_off">Turn Off System</option>
+	      		<option value ="start_playlist">Start Playlist</option>
+	    	</select>
+				<input type="checkbox" name="repeat" value="repeat_list" title="Repeat" />
+			</li>
+             <!-- <li><textarea id="descriptin" placeholder="Descripton"></textarea></li> -->
+         </ul>
+         <a href="#schedule" class="whiteButton" style="margin: 10px" onclick="submitEntry()">Add</a>
+     </form>
+ </div>
+
+
+</div>
+</body>
+</html>

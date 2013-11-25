@@ -1,0 +1,231 @@
+#!/usr/bin/perl -w
+use strict;
+
+# BEGIN {
+#     eval {
+#         require Audio::PortAudio;
+#     } || die "Can't find Audio::PortAudio. 
+# If you've build Audio::PortAudio but haven't installed it yet, use
+# perl -Mblib vumeter.pl [program options]
+# ";
+# }
+use Getopt::Long;
+
+system("echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd");
+system("echo 0 > /sys/kernel/debug/omap_mux/uart1_txd");
+system("stty -F /dev/ttyO1 speed 115200 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke noflsh -ixon -crtscts");
+
+my $samplefrequency = 24000;
+my $updatefrequency = 200;
+my $help = 0;
+my $avgchar = "#";
+my $peakchar = "|";
+my $blankchar = " ";
+my $verbose=0;
+my $channelcount = 1;
+my $api_name = "";
+my $device_name = "";
+my $s = GetOptions(
+    "samplefrequency=i",\$samplefrequency,
+    "updatefrequency=i",\$updatefrequency,
+    "avgchar=s",\$avgchar,
+    "peakchar=s",\$peakchar,
+    "blankchar=s",\$blankchar,
+    "verbose",\$verbose,
+    "channelcount=i",\$channelcount,
+    "api=s",\$api_name,
+    "device=s",\$device_name,
+    "help",\$help
+);
+if (!$s || $help) {
+    print "usage: $0 [options]
+options:
+  --samplefrequency VALUE   audio input rate. default = 22050
+  --updatefrequency VALUE   display update rate. default = 40
+  --peakchar        CHAR    character to display peak value. default = |
+  --avgchar         CHAR    character to display average power. default = #
+  --blankchar       CHAR    character to fill. default = ' ' (space)
+  --channelcount    NUM     number of input channels. default = 1
+  --api             NAME    API to use (ALSA, OSS ...)
+  --device          NAME    input device to use
+  --verbose                 be verbose
+  --help                    show this message
+
+example (default values):
+   vumeter.pl -u 40 -s 22050 -p '|' -av '#' -b ' '
+";
+    exit $s;
+}
+
+# 
+# if ($verbose) {
+#     print "Available APIs: ",join(", ",map { $_->name } Audio::PortAudio::host_apis()),"\n";
+# }
+# 
+# my $api;
+# if ($api_name) {
+#     ($api) = grep { lc($_->name) eq lc($api_name) } Audio::PortAudio::host_apis();
+# }
+# else {
+#     $api = Audio::PortAudio::default_host_api();
+# }
+# die "No api found" unless $api;
+# 
+# print "Using ".$api->name."\n" if $verbose;
+# 
+# if ($verbose) {
+#     print "Available devices: ",join(", ", map { $_->name } $api->devices ),"\n";
+# }
+# my $device;
+# if ($device_name) {
+#     ($device) = grep { $_->name eq $device_name } $api->devices;
+# }
+# else {
+#     $device = $api->default_input_device;
+# }
+# die "No device found" unless $device;
+# print "Using ".$device->name."\n" if $verbose;
+# 
+# print "max input channels: ",$device->max_input_channels,"\n" if $verbose;
+# die "too many channels" if $device->max_input_channels < $channelcount;
+# 
+# 
+# print "$avgchar = avg power, $peakchar = sample peak\n" if $verbose;
+# 
+# my $instream = $device->open_read_stream( { channel_count => $channelcount, sample_format => 'float32' }, $samplefrequency, 100, 0);
+
+
+$|=1;
+
+open(SERIAL, "> /dev/ttyO1");
+
+{
+my $previous_default = select(STDOUT);  # save previous default
+select(SERIAL);
+$|++;                                   # autoflush STDERR, to be sure
+select($previous_default);              # restore previous default
+}
+
+sub sendColor
+{
+my($address,$r,$g,$b,$v)= @_;
+$address = $address + 1;
+print SERIAL "4,$address,$r,$g,$b,$v;";		#	print "4,$address,$r,$g,$b,$v;\n";
+}
+my @color_array = (
+	[[255,50,50],[255,173,50],[214,255,50],[91,255,50],[50,255,132],[50,254,255],[50,132,255],[91,50,255],[214,50,255],[255,50,173]],
+	[[255,25,25],[255,163,25],[209,255,25],[71,255,25],[25,255,117],[25,254,255],[25,117,255],[71,25,255],[209,25,255],[255,25,163]],
+	[[255,0,0],[255,153,0],[203,255,0],[50,255,0],[0,255,102],[0,254,255],[0,101,255],[50,0,255],[203,0,255],[255,0,152]],
+	[[229,0,0],[229,137,0],[183,229,0],[45,229,0],[0,229,91],[0,229,229],[0,91,229],[45,0,229],[183,0,229],[229,0,137]],
+	[[204,0,0],[204,122,0],[163,204,0],[40,204,0],[0,204,81],[0,203,204],[0,81,204],[40,0,204],[163,0,204],[204,0,122]],
+	[[178,0,0],[178,107,0],[142,178,0],[35,178,0],[0,178,71],[0,178,178],[0,71,178],[35,0,178],[142,0,178],[178,0,107]],
+	[[153,0,0],[153,91,0],[122,153,0],[30,153,0],[0,153,61],[0,152,153],[0,61,153],[30,0,153],[122,0,153],[153,0,91]],
+	[[127,0,0],[127,76,0],[101,127,0],[25,127,0],[0,127,51],[0,127,127],[0,50,127],[25,0,127],[101,0,127],[127,0,76]],
+	[[102,0,0],[102,61,0],[81,102,0],[20,102,0],[0,102,40],[0,101,102],[0,40,102],[20,0,102],[81,0,102],[102,0,61],],
+	[[76,0,0],[76,45,0],[61,76,0],[15,76,0],[0,76,30],[0,76,76],[0,30,76],[15,0,76],[61,0,76],[76,0,45]],
+	[[51,0,0],[51,30,0],[40,51,0],[10,51,0],[0,51,20],[0,50,51],[0,20,51],[10,0,51],[40,0,51],[51,0,30]],
+	[[25,0,0],[25,15,0],[20,25,0],[5,25,0],[0,25,10],[0,25,25],[0,10,25],[5,0,25],[20,0,25],[25,0,15]],
+);
+
+my @color_order = (0,9, 2,6,4,1,5,7,3,8);
+our $NUM_LIGHTS = 10;
+
+for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
+	&sendColor($address,0,0,0,0);
+	#@{$oldRgb[$address]} = (0,0,0,0);
+}
+my $E = "\x{1b}"; # escape char
+
+my $log10_10 = 10 / log(10);
+my $buffer = 0;
+# $instream->start;
+
+sub calculate_FIR
+{
+ my ($data,$coeffs) = @_;
+ my $output = 0;
+# print "data size = ".scalar(@{$data})."\n";
+ for(my $i = 0; $i < scalar(@{$data}); $i++){
+	$output = $output + @{$data}[$i] * @{$coeffs}[$i];
+ }
+ return int($output/16384);
+}
+
+#my @t1 = (1,2,3,4,5);
+my @coeffs_0=(-344,12,420,851,1269,1640,1932,2119,2183,2119,1932,1640,1269,851,420,12,-344);
+
+my @maqs=(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+#my @t2 = (2,2,2,2,2);
+#calculate_FIR(\@t1,\@t2);
+#exit();
+print scalar(@maqs)." is the size and coeffs is ".scalar(@coeffs_0);
+my $frames = int($samplefrequency / $updatefrequency);
+print "frames = $frames\n";
+print "-40db     -30db     -20db     -10dB      0dB
+ .         .         .         .         .", "\n" x ($channelcount+1);
+
+binmode (STDIN);
+my $peak_count = 0;
+while (1) {
+    my $ok =1;
+    my @avg = map { 0 } 1 .. $channelcount;
+    my @peak = @avg;
+    my $c = 0;
+    my $t =0;
+     my $read_num = read (STDIN,$buffer,$frames*2);
+     if($read_num < $frames/4){
+        die "No More frames";
+     }
+    for (unpack("s".($frames),$buffer)) {
+       # print "$_ ";
+       unshift(@maqs,$_);
+       pop(@maqs);
+	#print "TTTT @maqs\n";
+	my $filt_output = $_; #calculate_FIR(\@maqs,\@coeffs_0);
+	#print scalar(@maqs)." ";
+        $avg[$c] += abs($filt_output);
+        $peak[$c] = abs($filt_output) if $peak[$c] < abs($filt_output);
+        $c = ++$c % $channelcount;
+	     $t++;
+    }
+    
+    for (@avg) {
+        $_ /= $frames;
+    }
+    
+   # print "$E\[".($channelcount)."A";
+    for (0 .. $channelcount -1) {
+        my $logged  = $avg[$_] ?  $log10_10 * log($avg[$_]) : 0;
+        $logged = 0 if $logged <0;
+        my $peak = $peak[$_] ?  $log10_10 * log($peak[$_]) : 0;
+        $peak = 0 if $peak < 0;
+        my $ddelta = int($peak) - int($logged);
+	#print "$logged $peak $ddelta\n ";
+	# my $line = ($avgchar x int($logged)).($peakchar x ($ddelta)).($blankchar x (41 - (int($logged) + $ddelta)));
+	#print "[$E\[32m",substr($line,0,20),"$E\[33m",substr($line,20,10),"$E\[31m",substr($line,30,10),"$E\[0m]\n";
+   my $level = (($logged-10)>=35)? 34: ($logged-10);
+   if($level <0){
+   	$level = 0;
+   }
+   $level = int($level / 3);
+   if($level >6 ){
+	   print "level = $level peak = $peak_count\n";
+	   $peak_count ++;
+   }
+   if($peak_count > 20){
+   	push(@color_order,shift(@color_order));
+	$peak_count = 0;
+   }
+   print "level = $level\n";
+for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
+	  	my($r,$g,$b) =@{$color_array[11-$level][$color_order[$address]]};
+		#print "$r,$g,$b\n";
+		&sendColor($address,$r,$g,$b,0);
+	}	
+
+   }
+    print "$t\r";
+    print "Buffer overflow @ ".localtime(time)."\r" if !$ok;
+}
+
+exit;

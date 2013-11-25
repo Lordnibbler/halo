@@ -1,0 +1,124 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<title>Halo Configuration Manager</title>
+
+<!-- additional head stuff -->
+
+<!-- <link type="text/css" href="http://web.me.com/glenrhodes/website/css/smoothness/jquery-ui-1.8.16.custom.css" rel="Stylesheet" />	
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script> -->
+
+<link type="text/css" href="css/smoothness/jquery-ui-1.8.16.custom.css" rel="Stylesheet" />	
+<script type="text/javascript" src="js/jquery-1.6.2.min.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.8.16.custom.min.js"></script>
+
+<link rel="stylesheet" type="text/css" href="picker.css">
+<script type="text/javascript" src="picker.js"></script>
+<meta name="viewport" content="user-scalable=no, width=device-width" />
+<!--  additional head stuff -->
+	<style>
+	#dialog label, #dialog input { display:block; }
+	#dialog label { margin-top: 0.5em; }
+	#dialog input, #dialog textarea { width: 95%; }
+/*	#tabs li .ui-icon-close { float: left; margin: 0.4em 0.2em 0 0; cursor: pointer; }*/
+	
+	
+	</style>
+	
+	<style type="text/css">
+
+	/* Vertical Tabs
+	----------------------------------*/
+	.ui-tabs-vertical { width: inherit; height:200px; position:absolute; top:32px;}
+	.ui-tabs-vertical .ui-tabs-nav { padding: .2em .1em .2em .2em; float: right; width: 120px;height:195px; overflow-y:scroll; overflow-x:hidden; }
+	.ui-tabs-vertical .ui-tabs-nav li { clear: left; width: 100%; border-bottom-width: 1px !important; border-right-width: 0 !important; margin: 0 1px .2em 0; }
+	.ui-tabs-vertical .ui-tabs-nav li a { display:block; width:65px; text-overflow: ellipsis;}
+	.ui-tabs-vertical .ui-tabs-nav li span { float:left; }
+	.ui-tabs-vertical .ui-tabs-nav li.ui-tabs-selected { padding-bottom: 0; padding-right: .1em; border-right-width: 1px; border-right-width: 1px; }
+	.ui-tabs-vertical .ui-tabs-panel { padding: 3px; float: left; width: 235px; height:195px; overflow-y:scroll; overflow-x:hidden;}
+	#playlist_title {display:block; background:red; left: 0px;	top: 0px; position: absolute; width:235px; height:32px; padding:8px 10px 0px 10px;}
+	#playlist_toolbar {display:block; background:green; left: 250px; top: 0px; position: absolute; width:120px; height:32px; padding:0px 2px 0px 3px;}
+	#playlist_add { cursor: pointer; position:absolute; }
+	#add_tab { cursor: pointer;  float:right; width:32px; height:32px;}
+	#playlist_save { cursor: pointer; float:left;width:32px; height:32px;}
+		</style>
+</head>
+<body>
+
+
+<!-- content start *********************************** -->
+<div id="color_picker">
+
+</div>
+
+<div id="playlist">
+	
+	<div id="control_panel"> 
+		<div id="playlist_title" class="ui-corner-all">Playlist Title</div>
+		<div id="playlist_toolbar" class="ui-corner-all"> 
+			<button type="button"  style="background-image:url(images/add-32.png); background-color: transparent; border-width: 0px;" id="add_tab"> </button>
+			<button type="button"   style="background-image:url(images/save-Archive-Blue-32.png); background-color: transparent;border-width: 0px;"  title="Save" id="playlist_save"> </button>
+		</div>
+		 <div id="dialog" title="New Playlist">
+			<form>
+				<fieldset class="ui-helper-reset">
+					<label for="tab_title">Title</label>
+					<input type="text" name="tab_title" id="tab_title" value="" class="ui-widget-content ui-corner-all" />
+				</fieldset>
+			</form>
+		</div>
+		
+		<div id="dialog_rename" title="Rename Playlist">
+			<form>
+				<fieldset class="ui-helper-reset">
+					<label for="tab_rename_input">Title</label>
+					<input type="text" name="tab_rename" id="tab_rename" value="" class="ui-widget-content ui-corner-all" />
+				</fieldset>
+			</form>
+		</div>
+
+		<div id="tabs">
+			<ul>
+			
+			</ul>
+			
+		</div>
+		 
+	</div>
+	
+	<button type="button" class="ui-button playlist_button"  title="Add" id="playlist_add">Add to Playlist</button>
+	
+	<div class="popup_item" title="new" id="timeline_new_button"></div>
+	<div class="popup_item" title="delete" id="timeline_delete_button"></div>
+	<div class="popup_item" title="open" id="timeline_open_button"></div>
+	
+</div>
+
+<div id="time_line_topbar">
+	<div><input placeholder="Sequence Title" type="text" name="Title" id="sequence_title" /> </div>
+	<div class="popup_item" title="Save" id="timeline_save_button"></div>
+	<div class ="popup_item" title="Add Column" id="timeline_add_button"></div>
+</div>
+
+	
+<div id="new_scene_selector">
+</div>
+<div id="time_line">	
+</div>
+
+<div id="column_popup">
+	<div class="popup_item" id="insert_before"></div>
+	<div class="popup_item" id="preview"></div>
+	<div class="popup_item" id="delete_column"></div>
+	<div class="popup_item" id="insert_after"></div>
+</div>
+
+<div id="log"></div>
+<!-- <div id="log2"></div> -->
+
+<!-- content end ************************************* -->
+
+
+</body>
+</html>

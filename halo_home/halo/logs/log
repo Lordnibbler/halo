@@ -1,0 +1,9 @@
+set_playlist found, opening...
+read ACTIVE_PLAYLIST volvo
+
+Opened playlist volvo: 
+poweron found, opening...
+read POWER 1
+
+Parent here
+open timeline 
