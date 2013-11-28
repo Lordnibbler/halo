@@ -10,6 +10,8 @@ $playdir = "/home/root/halo/playlists/";
 
 our $NUM_LIGHTS = 10;
 my $SYSTEM_ON = 0;
+my $LIVE_PREVIEW = 1;
+
 
 my $playlist = ();
 my $playistLength;
@@ -29,8 +31,9 @@ my $timeslotSlope = ();
 my $fadeTime = 250;
 
 
-system("echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd");
-system("echo 0 > /sys/kernel/debug/omap_mux/uart1_txd");
+# system("echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd");
+# system("echo 0 > /sys/kernel/debug/omap_mux/uart1_txd");
+system("echo BB-UART1 > /sys/devices/bone_capemgr.7/slots");
 system("stty -F /dev/ttyO1 speed 115200 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke noflsh -ixon -crtscts");
 
 $|=1;
@@ -72,13 +75,13 @@ sub findSlope
 {
 	my($r,$g,$b,$violet,$er,$eg,$eb,$ev, $steps)= @_;
 	my $rdiff,$gdiff,$bdiff,$vdiff;
-	
+
 	$rdiff = ($er - $r) / $steps;
 	$gdiff = ($eg - $g) / $steps;
 	$bdiff = ($eb - $b) / $steps;
-	
+
 	$vdiff = ($ev - $violet)/ $steps;
-	
+
 	return ($rdiff,$gdiff,$bdiff,$vdiff);
 }
 sub interpolate
@@ -103,11 +106,11 @@ sub turnOffAll
 	 	&sendColor($address,0,0,0,0);
 		@{$oldRgb[$address]} = (0,0,0,0);
 	}
-	
+
 }
 sub openTimeline{
 	my($timeline_name) = @_;
-	
+
 	open(TIMELINE, "< ${seqdir}${timeline_name}.html");
 	print "open timeline $timeline_name\n";
 	@html = split(/\<div|\<td|\<input/,<TIMELINE>);
@@ -115,7 +118,7 @@ sub openTimeline{
 	my $light_index = 0;
 	my $sequence_index = -1;
 	my $timeslot= ();
-	
+
 	foreach(@html){
 		if($_=~/.*selector_circle.*rgb\(([0-9]+)\,\s([0-9]+)\,\s([0-9]+)\)/)#rgb\(([0-9]+)\s\,([0-9]+)\s\,([0-9]+)\)
 		{
@@ -157,8 +160,8 @@ sub openTimeline{
 	}
 
 	push(@{$sequence[$sequence_index]},@timeslot);
-	undef(@timeslot);	
-	
+	undef(@timeslot);
+
 	close(TIMELINE);
 	$sequenceLength = @sequence;
 	$sequenceIndex = 0;
@@ -166,11 +169,11 @@ sub openTimeline{
 
 sub openPlaylist{
 	my($playlist_name) = @_;
-	
+
 	open(PLAYLIST, "< ${playdir}${playlist_name}.txt");
-	
+
 	undef(@playlist); #empty timeline
-	
+
 	@playlist = split(/\,/,<PLAYLIST>);
 	print "Opened playlist $playlist_name: \n";
 	foreach $seq_name (@playlist){
@@ -193,7 +196,7 @@ sub handleCommands{
 		$command = <COMMAND_FILE>;
 		print "read $command\n";
 		if($command =~ /ACTIVE_SEQUENCE\s+([\w0-9]*)/){
-			
+
 			openTimeline($1);
 		}elsif ($command =~ /POWER\s+([0-1])/){
 			$SYSTEM_ON = $1;
@@ -201,26 +204,67 @@ sub handleCommands{
 				&turnOffAll();
 			}
 		}elsif ($command =~ /ACTIVE_PLAYLIST\s+([\w0-9]*)/){
-			openPlaylist($1);	
+			openPlaylist($1);
 		}elsif ($command =~ /CHANGE_LIGHT/){
 			print "Previewing\n";
 			$SYSTEM_ON = 0;
-			for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
-				$color = <COMMAND_FILE>;
+			while($color = <COMMAND_FILE>){
+         # for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
 				if($color =~ /([0-9]+)\,([0-9]+)\,([0-9]+)\,([0-9]+)/){
 					print "$1, $2, $3, $4 found\n";
 					&sendColor($address,$1,$2,$3,$4);
 				}
-				
+
 			}
-		
-			
+		}elsif ($command =~ /LIVE_PREVIEW\s+([\w0-9]*)/){
+		   $LIVE_PREVIEW = $1;
+		   $SYSTEM_ON = 0;
 		}
 		close(COMMAND_FILE);
 		unlink($fullname);
-	  
+
 	}
-	
+
+}
+
+sub grabLiveData{
+
+   @preview_data =`curl http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null`;
+   # print @preview_data;
+
+   @processed_data = ();
+   while($color = <@preview_data>){
+      if($color =~ /([0-9]+)\,([0-9]+)\,([0-9]+)\,([0-9]+)/){
+          # print "$1, $2, $3, $4 found\n";
+          my @rgb = ($1,$2,$3,0);
+   		 push(@processed_data,[@rgb]);
+       }
+   }
+
+   $previewLength = @processed_data;
+   # print "$previewLength data chunks\n";
+   $start =0;
+   if($previewLength > 4){
+       $start = $previewLength - 4;
+   }else{
+      $start = 0;
+   }
+   # print "i is $i, total size is $previewLength";
+   $address = 0;
+   for($i = $start;$i< $previewLength; $i ++){
+      my @rgb = @{$processed_data[$i]};
+      # print @rgb;
+      # printf("address %d R= %d G=%d B=%d\n",$address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
+      &sendColor($address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
+      $address ++;
+   }
+   if($previewLength < 4){
+      while($address < 4){
+         &sendColor($address,0,0,0,0);
+         $address ++;
+      }
+   }
+
 }
 
 
@@ -241,7 +285,7 @@ sub forkFade
 	if( waitpid(-1,WNOHANG ) >= 0){
 		return 0;
 	}
-	
+
 	my $pid = fork();
 
 	if($pid){
@@ -252,34 +296,34 @@ sub forkFade
 		exit(0);
 	}else {
 		die "couldn’t fork: $!\n";
-	}	
-	
+	}
+
 	for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
 		my ($r,$g,$b,$v)= @{$sequence[$sequenceIndex][$address]};
 		@{$oldRgb[$address]} = ($r,$g,$b,$v);
 	}
-	
+
 	return 1;
 }
 
 
 sub fadeColor {
-	
-	my $maxSteps = 0;	
+
+	my $maxSteps = 0;
 	# for($address = 0; $address < $NUM_LIGHTS; $address ++){
 	# 	my $curMax = abs(&maxDiff(@{$oldRgb[$address]},@{$sequence[$sequenceIndex][$address]}));
 	# 	if($curMax > $maxSteps){
 	# 		$maxSteps = $curMax;
 	# 	}
 	# }
-	
+
 	my @timing= @{$sequence[$sequenceIndex][$NUM_LIGHTS]};
-	
+
 	$fadeTime = @timing[1];
 	my $sleepTime = @timing[0];
-	
+
 	print "sleep = $sleepTime fade = $fadeTime\n";
-	
+
 	$maxSteps = int(($fadeTime*15)/1000 );
 
 	if($maxSteps == 0){
@@ -292,38 +336,43 @@ sub fadeColor {
 	for(my $address = 0; $address < $NUM_LIGHTS; $address ++){
 		push(@{$timeslotSlope[$address]},findSlope(@{$oldRgb[$address]},@{$sequence[$sequenceIndex][$address]},$maxSteps));
 	}
-	
+
 	for(my $x = 0; $x <=$maxSteps ; $x++){
 		#print("starting step $x\n");
 		for(my $address = 0; $address < $NUM_LIGHTS ; $address ++){
 			my ($r,$g,$b,$v)= @{$oldRgb[$address]};
-		
+
 			 my $writeRed = &interpolate($timeslotSlope[$address][0],$x,$r);
 			 my $writeGreen = &interpolate($timeslotSlope[$address][1],$x,$g);
 			 my $writeBlue =  &interpolate($timeslotSlope[$address][2],$x,$b);
 		 	 my $writeViolet = &interpolate($timeslotSlope[$address][3],$x,$v);
 		 	&sendColor($address,$writeRed,$writeGreen,$writeBlue,$writeViolet);
 		}
-		usleep(20000);	
+		usleep(20000);
 	}
 	undef(@timeslotSlope);
-	
+
 	sleep($sleepTime);
 }
 
 
 while(1){
-	
-	usleep(20000);
+
+	if($LIVE_PREVIEW == 0){
+	   usleep(20000);
+   }
 	if($openSequence_flag){ #Either we have a new playlist or the current sequence just ended
 		$openSequence_flag = 0; #clear open timeline flag
 		&openTimeline($playlist[$playlistIndex]);
 		$playlistIndex++;
-		if($playlistIndex == $playlistLength){ #wrap around 
+		if($playlistIndex == $playlistLength){ #wrap around
 			$playlistIndex = 0;
 		}
 	}
 	&handleCommands();
+	if($LIVE_PREVIEW == 1){
+	   &grabLiveData();
+	}
 	if($SYSTEM_ON == 1){
 		if(&forkFade()) {
 			$sequenceIndex ++;
