@@ -227,51 +227,6 @@ sub handleCommands{
 
 }
 
-sub grabLiveData{
-
-   @preview_data =`curl http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null`;
-   # print @preview_data;
-
-   @processed_data = ();
-   while($color = <@preview_data>){
-      if($color =~ /([0-9]+)\,([0-9]+)\,([0-9]+)\,([0-9]+)/){
-          # print "$1, $2, $3, $4 found\n";
-          my @rgb = ($1,$2,$3,0);
-   		 push(@processed_data,[@rgb]);
-       }
-   }
-
-   $previewLength = @processed_data;
-   # print "$previewLength data chunks\n";
-   $start =0;
-   if($previewLength > 4){
-       $start = $previewLength - 4;
-   }else{
-      $start = 0;
-   }
-   # print "i is $i, total size is $previewLength";
-   $address = 0;
-   for($i = $start;$i< $previewLength; $i ++){
-      my @rgb = @{$processed_data[$i]};
-      # print @rgb;
-      # printf("address %d R= %d G=%d B=%d\n",$address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
-      &sendColor($address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
-      $address ++;
-   }
-   if($previewLength < 4){
-      while($address < 4){
-         &sendColor($address,0,0,0,0);
-         $address ++;
-      }
-   }
-
-}
-
-
-
-
-
-
 #printf("sequence 0, address 0 R= %d G=%d B=%d\n",$sequence[0][2][0],$sequence[0][2][1],$sequence[0][2][2]);
 
 
@@ -370,9 +325,7 @@ while(1){
 		}
 	}
 	&handleCommands();
-	if($LIVE_PREVIEW == 1){
-	   &grabLiveData();
-	}
+
 	if($SYSTEM_ON == 1){
 		if(&forkFade()) {
 			$sequenceIndex ++;
