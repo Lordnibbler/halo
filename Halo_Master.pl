@@ -1,14 +1,15 @@
 #!/usr/bin/perl
 
 # use Device::SerialPort;
-use Time::HiRes qw(usleep);
+use Time::HiRes qw(usleep time);
 use POSIX ":sys_wait_h";
+#use LWP::Simple qw (get);
 
-$cmddir = "/home/root/halo/commands/";
-$seqdir = "/home/root/halo/sequences/";
-$playdir = "/home/root/halo/playlists/";
+$cmddir = "/home/root/halo_git/commands/";
+$seqdir = "/home/root/halo_git/sequences/";
+$playdir = "/home/root/halo_git/playlists/";
 
-our $NUM_LIGHTS = 10;
+our $NUM_LIGHTS = 5;
 my $SYSTEM_ON = 0;
 my $LIVE_PREVIEW = 1;
 
@@ -33,13 +34,16 @@ my $fadeTime = 250;
 
 # system("echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd");
 # system("echo 0 > /sys/kernel/debug/omap_mux/uart1_txd");
-system("echo BB-UART1 > /sys/devices/bone_capemgr.7/slots");
+system("echo BB-UART1 > /sys/devices/bone_capemgr.9/slots");
 system("stty -F /dev/ttyO1 speed 115200 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke noflsh -ixon -crtscts");
 
 $|=1;
 
 open(SERIAL, "> /dev/ttyO1");
 
+sysopen(PREVIEW_DATA, "/home/root/colorpicker-beaglebone/colors.txt", O_RONLY)
+        or die "can't read pipe: $!";
+   
 {
 my $previous_default = select(STDOUT);  # save previous default
 select(SERIAL);
@@ -227,44 +231,69 @@ sub handleCommands{
 
 }
 
+$start_time = time();
+
 sub grabLiveData{
 
-   @preview_data =`curl http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null`;
+   # open(COLORS, '|-', "wget -q -O- http://colorpicker.herokuapp.com/api/redis_get_colors");
+   
+   #open(PREVIEW_DATA, "wget -q -O- http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null |");
+   
+   #("154,144,218,000", "061,159,184,000");
+   #`curl http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null`;
    # print @preview_data;
-
-   @processed_data = ();
-   while($color = <@preview_data>){
-      if($color =~ /([0-9]+)\,([0-9]+)\,([0-9]+)\,([0-9]+)/){
-          # print "$1, $2, $3, $4 found\n";
-          my @rgb = ($1,$2,$3,0);
-   		 push(@processed_data,[@rgb]);
-       }
-   }
-
-   $previewLength = @processed_data;
-   # print "$previewLength data chunks\n";
-   $start =0;
-   if($previewLength > 4){
-       $start = $previewLength - 4;
-   }else{
-      $start = 0;
-   }
-   # print "i is $i, total size is $previewLength";
-   $address = 0;
-   for($i = $start;$i< $previewLength; $i ++){
-      my @rgb = @{$processed_data[$i]};
-      # print @rgb;
-      # printf("address %d R= %d G=%d B=%d\n",$address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
-      &sendColor($address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
-      $address ++;
-   }
-   if($previewLength < 4){
-      while($address < 4){
-         &sendColor($address,0,0,0,0);
-         $address ++;
+   $rin = '';
+   vec($rin, fileno(PREVIEW_DATA), 1) = 1;
+   $nfound = select($rin, undef, undef, 0);    # just check
+   if ($nfound) {
+   
+ 
+      @processed_data = ();
+      while($color = <PREVIEW_DATA>){
+         #print $color;
+         #print "Glen\n";
+         if($color =~ /.*END_LINE.*/){
+             # print "END_FILE FOUND\n";
+             last;
+         }
+         if($color =~ /([0-9]+)\,([0-9]+)\,([0-9]+)\,([0-9]+)/){
+             # print "$1, $2, $3, $4 found\n";
+             my @rgb = ($1,$2,$3,0);
+      		 push(@processed_data,[@rgb]);
+          }
       }
-   }
-
+      # close PREVIEW_DATA or die "bad netstat: $! $?";
+   
+      $previewLength = @processed_data;
+      if( $previewLength > 0){
+         my $end_time = time();
+         printf("%d %.6f\n", $previewLength,$end_time - $start_time);
+         $start_time = time();
+         # print "$previewLength data chunks\n";
+         $start =0;
+         if($previewLength > 4){
+             $start = $previewLength - 4;
+         }else{
+            $start = 0;
+         }
+         # print "i is $i, total size is $previewLength";
+         $address = 0;
+         for($i = $start;$i< $previewLength; $i ++){
+            my @rgb = @{$processed_data[$i]};
+            # print @rgb;
+            # printf("address %d R= %d G=%d B=%d\n",$address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
+            &sendColor($address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
+            $address ++;
+         }
+         if($previewLength < 4){
+            while($address < 4){
+               &sendColor($address,0,0,0,0);
+               $address ++;
+            }
+         }
+         
+      }
+   }  
 }
 
 
@@ -358,9 +387,9 @@ sub fadeColor {
 
 while(1){
 
-	if($LIVE_PREVIEW == 0){
-	   usleep(20000);
-   }
+   # if($LIVE_PREVIEW == 0){
+       # usleep(10000);
+   # }
 	if($openSequence_flag){ #Either we have a new playlist or the current sequence just ended
 		$openSequence_flag = 0; #clear open timeline flag
 		&openTimeline($playlist[$playlistIndex]);
@@ -371,7 +400,8 @@ while(1){
 	}
 	&handleCommands();
 	if($LIVE_PREVIEW == 1){
-	   &grabLiveData();
+      &grabLiveData();
+      
 	}
 	if($SYSTEM_ON == 1){
 		if(&forkFade()) {
