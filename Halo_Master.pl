@@ -43,7 +43,7 @@ open(SERIAL, "> /dev/ttyO1");
 
 sysopen(PREVIEW_DATA, "/home/root/colorpicker-beaglebone/colors.txt", O_RONLY)
         or die "can't read pipe: $!";
-   
+
 {
 my $previous_default = select(STDOUT);  # save previous default
 select(SERIAL);
@@ -236,9 +236,9 @@ $start_time = time();
 sub grabLiveData{
 
    # open(COLORS, '|-', "wget -q -O- http://colorpicker.herokuapp.com/api/redis_get_colors");
-   
+
    #open(PREVIEW_DATA, "wget -q -O- http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null |");
-   
+
    #("154,144,218,000", "061,159,184,000");
    #`curl http://colorpicker.herokuapp.com/api/redis_get_colors 2>/dev/null`;
    # print @preview_data;
@@ -246,8 +246,8 @@ sub grabLiveData{
    vec($rin, fileno(PREVIEW_DATA), 1) = 1;
    $nfound = select($rin, undef, undef, 0);    # just check
    if ($nfound) {
-   
- 
+
+
       @processed_data = ();
       while($color = <PREVIEW_DATA>){
          #print $color;
@@ -263,7 +263,7 @@ sub grabLiveData{
           }
       }
       # close PREVIEW_DATA or die "bad netstat: $! $?";
-   
+
       $previewLength = @processed_data;
       if( $previewLength > 0){
          my $end_time = time();
@@ -271,8 +271,8 @@ sub grabLiveData{
          $start_time = time();
          # print "$previewLength data chunks\n";
          $start =0;
-         if($previewLength > 4){
-             $start = $previewLength - 4;
+         if($previewLength > $NUM_LIGHTS){
+             $start = $previewLength - $NUM_LIGHTS;
          }else{
             $start = 0;
          }
@@ -285,15 +285,15 @@ sub grabLiveData{
             &sendColor($address,$rgb[0],$rgb[1],$rgb[2],$rgb[3]);
             $address ++;
          }
-         if($previewLength < 4){
-            while($address < 4){
+         if($previewLength < $NUM_LIGHTS){
+            while($address < $NUM_LIGHTS){
                &sendColor($address,0,0,0,0);
                $address ++;
             }
          }
-         
+
       }
-   }  
+   }
 }
 
 
@@ -401,7 +401,7 @@ while(1){
 	&handleCommands();
 	if($LIVE_PREVIEW == 1){
       &grabLiveData();
-      
+
 	}
 	if($SYSTEM_ON == 1){
 		if(&forkFade()) {
@@ -413,4 +413,3 @@ while(1){
 		}
 	}
 }
-
